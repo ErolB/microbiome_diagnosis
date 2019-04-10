@@ -171,7 +171,6 @@ def optimize_knn(data, labels, parameters, plotting=False):
             parameters = {'n_components': d, 'n_neighbors': n, 'r_method': 'pca'}
             acc_list.append(k_fold_validation(data, labels, knn_test, parameters))
         z.append(acc_list)
-    ax = plt.axes(projection='3d')
     optimum = np.argmax(np.array(z))
     optimal_value = np.array(z).flatten()[optimum]
     optimal_dimension = n_dimensions[int(optimum%len(n_dimensions))]
@@ -179,6 +178,7 @@ def optimize_knn(data, labels, parameters, plotting=False):
     n_neighbors, n_dimensions = np.meshgrid(n_neighbors, n_dimensions)
     z = np.array(z).transpose()
     if plotting:
+        ax = plt.axes(projection='3d')
         ax.plot_surface(n_neighbors, n_dimensions, z)
         ax.set_xlabel('number of neighbors')
         ax.set_ylabel('number of dimensions')
@@ -203,22 +203,18 @@ def optimize_svm(data, labels, parameters, iterations = 10, plotting=False):
     return dimensions[np.argmax(acc_list)], max(acc_list)
 
 
-def optimize_nn(data, labels, parameters, iterations = 10, plotting = False):
+def optimize_nn(data, labels, parameters, iterations = 5, plotting = False):
     hidden_layer_counts = range(0, 2)
     dimensions = parameters['dimension_range']
-    ratios = np.arange(0.8, 2, 0.4)
-    tensor = []
+    acc_array = []
     for d in dimensions:
-        array = []
+        acc_list = []
         for c in hidden_layer_counts:
-            acc_list = []
-            for r in ratios:
-                parameters = {'ratio': r, 'n_layers': c, 'r_method': 'pca', 'n_components': d}
-                acc = k_fold_validation(data, labels, nn_test, parameters)
-                acc_list.append(acc)
-            array.append(acc_list)
-        tensor.append(array)
-    return np.argmax(np.asarray(tensor)), np.max(np.asarray(tensor))
+            parameters = {'ratio': 1.5, 'n_layers': c, 'r_method': 'pca', 'n_components': d}
+            acc = k_fold_validation(data, labels, nn_test, parameters)
+            acc_list.append(acc)
+        acc_array.append(acc_list)
+    return np.argmax(np.asarray(acc_array)), np.max(np.asarray(acc_array))
 
 
 if __name__ == '__main__':
@@ -227,17 +223,19 @@ if __name__ == '__main__':
     data, labels = pd_to_data(pos, neg)
     with open('results.txt', 'w') as out_file:
         # NN with PCA
-        parameters = {'dimension_range': range(200, 1000, 200)}
+        '''
+        parameters = {'dimension_range': range(10, 80, 20)}
         out_file.write(str(optimize_nn(data, labels, parameters)))
         # SVM with PCA
         parameters = {'r_method': 'pca', 'dimension_range': range(2, 20, 2)}
         out_file.write(str(optimize_svm(data, labels, parameters, iterations=10)))
+        '''
         # SVM with RFE
         parameters = {'r_method': 'rfe', 'dimension_range': range(2, 20, 2)}
-        out_file.write(str(optimize_svm(data, labels, parameters, iterations=10)))
+        out_file.write(str(optimize_svm(data, labels, parameters, iterations=10, plotting=True)))
         # random forest with RFE
         parameters = {'r_method': 'rfe', 'dimension_range': range(len(data[0])-1000, len(data[0]), 100)}
-        out_file.write(str(optimize_rf(data, labels, parameters, iterations=10)))
+        out_file.write(str(optimize_rf(data, labels, parameters, iterations=10, plotting=True)))
         # random forest with PCA
         parameters = {'r_method': 'pca', 'dimension_range': range(len(data[0]) - 1000, len(data[0]), 100)}
         print(str(optimize_rf(data, labels, parameters, iterations=10)))
