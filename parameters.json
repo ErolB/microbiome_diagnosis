@@ -1,0 +1,47 @@
+{
+  "nn_unfiltered": {
+    "use": false
+  },
+  "nn_pca": {
+    "use": false,
+    "min_dimension": 2,
+    "max_dimension": 50,
+    "step": 2
+  },
+  "svm_unfiltered": {
+    "use": true
+  },
+  "svm_pca": {
+    "use": true,
+    "min_dimension": 2,
+    "max_dimension": 50,
+    "step": 2
+  },
+  "svm_rfe": {
+    "use": false,
+    "min_dimension": 200,
+    "max_dimension": 6000,
+    "step": 200
+  },
+  "rf_unfiltered": {
+    "use": true
+  },
+  "rf_pca": {
+    "use": true,
+    "min_dimension": 2,
+    "max_dimension": 50,
+    "step": 2
+  },
+  "rf_rfe": {
+    "use": false,
+    "min_dimension": 200,
+    "max_dimension": 6000,
+    "step": 200
+  },
+  "knn_pca": {
+    "use": true,
+    "min_dimension": 2,
+    "max_dimension": 50,
+    "step": 2
+  }
+}

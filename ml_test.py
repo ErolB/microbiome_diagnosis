@@ -6,10 +6,14 @@ from sklearn.ensemble.forest import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier as KNN
 from tensorflow import keras
 import numpy as np
-
+import sys
+import time
+import json
 #from mpl_toolkits.mplot3d import Axes3D
-
 from parsing import load_data
+
+mode = 'test'
+# mode = 'normal'
 
 class RandomForestClassifierRFE(RandomForestClassifier):
     def fit(self, *args, **kwargs):
@@ -126,11 +130,88 @@ def k_fold_validation(data, labels, ml_test, parameters, k=0.25):
         testing_labels = labels[t * i:t * (i + 1)]
         testing = (testing_data, testing_labels)
         new_parameters = parameters.copy()
-        if parameters['r_method'] == 'pca':
+        if parameters['r_method'] == 'pca':  # PCA is handled here while RFE is handled within the classifiers
             training, testing = pca_reduce(training, testing, parameters['n_components'])
             new_parameters['n_components'] = None  # tells the SVM function not to apply filtering
         score_sum += ml_test(training, testing, new_parameters)
     return score_sum / n_iterations
+
+
+def optimize_knn(data, labels, parameters, iterations=10, plotting=False):
+    k = 0.25  # proportion of data used for testing
+    n_dimensions = list(parameters['dimension_range'])
+    n_neighbors = list(range(1, 20))
+    z = []
+    for n in n_neighbors:
+        acc_list = []
+        for d in n_dimensions:
+            total = 0
+            parameters = {'n_components': d, 'n_neighbors': n, 'r_method': 'pca'}
+            for i in range(iterations):
+                total += k_fold_validation(data, labels, knn_test, parameters)
+            acc_list.append(total/iterations)
+        z.append(acc_list)
+    optimum = np.argmax(np.array(z))
+    optimal_value = np.array(z).flatten()[optimum]
+    optimal_dimension = n_dimensions[int(optimum%len(n_dimensions))]
+    optimal_neighbors = n_neighbors[int(optimum / len(n_dimensions))]
+    n_neighbors, n_dimensions = np.meshgrid(n_neighbors, n_dimensions)
+    z = np.array(z).transpose()
+    if plotting:
+        ax = plt.axes(projection='3d')
+        ax.plot_surface(n_neighbors, n_dimensions, z)
+        ax.set_xlabel('number of neighbors')
+        ax.set_ylabel('number of dimensions')
+        plt.show()
+    return optimal_dimension, optimal_neighbors, optimal_value
+
+
+def optimize_svm(data, labels, parameters, iterations = 10, plotting=False):
+    k = 0.25  # proportion of data used for testing
+    dimensions = parameters['dimension_range']
+    acc_list = []
+    for d in dimensions:
+        parameters['n_components'] = d
+        total = 0
+        for i in range(iterations):
+            total += k_fold_validation(data, labels, svm_test, parameters)
+        acc_list.append(total/iterations)
+    if plotting:
+        plt.plot(dimensions, acc_list)
+        plt.xlabel('number of dimensions')
+        plt.ylabel('classifier accuracy')
+        plt.show()
+    return dimensions[np.argmax(acc_list)], max(acc_list)
+
+
+def optimize_nn(data, labels, parameters, iterations = 5, plotting = False):
+    hidden_layer_counts = range(0, 3)
+    dimensions = parameters['dimension_range']
+    acc_array = []
+    for d in dimensions:
+        acc_list = []
+        for c in hidden_layer_counts:
+            parameters = {'ratio': 1.5, 'n_layers': c, 'r_method': 'pca', 'n_components': d}
+            acc = k_fold_validation(data, labels, nn_test, parameters)
+            acc_list.append(acc)
+        acc_array.append(acc_list)
+    max_arg = np.argmax(np.asarray(acc_array))
+    optimal_dimensions = dimensions[int(max_arg/len(hidden_layer_counts))]
+    optimal_layers = max_arg % len(hidden_layer_counts)
+    return optimal_dimensions, optimal_layers, np.max(np.asarray(acc_array))
+
+
+def optimize_nn_unfiltered(data, labels, parameters=None, iterations = 5, plotting = False):
+    hidden_layer_counts = range(0, 3)
+    acc_list = []
+    for c in hidden_layer_counts:
+        parameters = {'ratio': 1.5, 'n_layers': c, 'r_method': None}
+        acc = k_fold_validation(data, labels, nn_test, parameters)
+        acc_list.append(acc)
+    max_arg = np.argmax(np.asarray(acc_list))
+    optimal_layers = hidden_layer_counts[max_arg]
+    return optimal_layers, np.max(np.asarray(acc_list))
+
 
 def optimize_rf(data, labels, parameters, iterations=10, plotting=False):
     k = 0.25  # proportion of data used for testing
@@ -160,86 +241,84 @@ def rf_no_filtering(data, labels, iterations=10):
     return total / iterations
 
 
-def optimize_knn(data, labels, parameters, plotting=False):
-    k = 0.25  # proportion of data used for testing
-    n_dimensions = list(parameters['dimension_range'])
-    n_neighbors = list(range(1, 20))
-    z = []
-    for n in n_neighbors:
-        acc_list = []
-        for d in n_dimensions:
-            parameters = {'n_components': d, 'n_neighbors': n, 'r_method': 'pca'}
-            acc_list.append(k_fold_validation(data, labels, knn_test, parameters))
-        z.append(acc_list)
-    optimum = np.argmax(np.array(z))
-    optimal_value = np.array(z).flatten()[optimum]
-    optimal_dimension = n_dimensions[int(optimum%len(n_dimensions))]
-    optimal_neighbors = n_neighbors[int(optimum / len(n_dimensions))]
-    n_neighbors, n_dimensions = np.meshgrid(n_neighbors, n_dimensions)
-    z = np.array(z).transpose()
-    if plotting:
-        ax = plt.axes(projection='3d')
-        ax.plot_surface(n_neighbors, n_dimensions, z)
-        ax.set_xlabel('number of neighbors')
-        ax.set_ylabel('number of dimensions')
-        plt.show()
-    return optimal_dimension, optimal_neighbors, optimal_value
-
-def optimize_svm(data, labels, parameters, iterations = 10, plotting=False):
-    k = 0.25  # proportion of data used for testing
-    dimensions = parameters['dimension_range']
-    acc_list = []
-    for d in dimensions:
-        parameters['n_components'] = d
-        total = 0
-        for i in range(iterations):
-            total += k_fold_validation(data, labels, svm_test, parameters)
-        acc_list.append(total/iterations)
-    if plotting:
-        plt.plot(dimensions, acc_list)
-        plt.xlabel('number of dimensions')
-        plt.ylabel('classifier accuracy')
-        plt.show()
-    return dimensions[np.argmax(acc_list)], max(acc_list)
-
-
-def optimize_nn(data, labels, parameters, iterations = 5, plotting = False):
-    hidden_layer_counts = range(0, 2)
-    dimensions = parameters['dimension_range']
-    acc_array = []
-    for d in dimensions:
-        acc_list = []
-        for c in hidden_layer_counts:
-            parameters = {'ratio': 1.5, 'n_layers': c, 'r_method': 'pca', 'n_components': d}
-            acc = k_fold_validation(data, labels, nn_test, parameters)
-            acc_list.append(acc)
-        acc_array.append(acc_list)
-    return np.argmax(np.asarray(acc_array)), np.max(np.asarray(acc_array))
-
-
 if __name__ == '__main__':
     k = 0.25  # proportion of data used for testing
-    pos, neg = load_data('formatted_data/rats_colon')
+    # load parameters
+    options = json.loads(open('parameters.json', 'r').read())
+    # load data
+    if mode == 'test':
+        pos, neg = load_data('formatted_data/rats_97')
+    else:
+        pos, neg = load_data(sys.argv[1])
     data, labels = pd_to_data(pos, neg)
+    # test classifiers
     with open('results.txt', 'w') as out_file:
+        # NN unfiltered
+        if options['nn_unfiltered']['use']:
+            print('optimizing NN without filtering')
+            nn_unfiltered_results = optimize_nn_unfiltered(data, labels)
+            out_file.write('#neural network without dimensional reduction\n')
+            out_file.write('Optimum at {} hidden layers with {}% accuracy\n\n'.format(nn_unfiltered_results[0], nn_unfiltered_results[1]*100))
         # NN with PCA
-        '''
-        parameters = {'dimension_range': range(10, 80, 20)}
-        out_file.write(str(optimize_nn(data, labels, parameters)))
+        if options['nn_pca']['use']:
+            print('optimizing NN with PCA')
+            min_dimension = options['nn_pca']['min_dimension']
+            max_dimension = options['nn_pca']['max_dimension']
+            step = options['nn_pca']['step']
+            parameters = {'dimension_range': range(min_dimension, max_dimension, step)}
+            nn_pca_results = optimize_nn(data, labels, parameters)
+            out_file.write('#neural network with dimensional reduction via PCA\n')
+            out_file.write('Optimum at {} dimensions and {} hidden layers with {}% accuracy\n\n'.format(nn_pca_results[0], nn_pca_results[1], nn_pca_results[2]*100))
         # SVM with PCA
-        parameters = {'r_method': 'pca', 'dimension_range': range(2, 20, 2)}
-        out_file.write(str(optimize_svm(data, labels, parameters, iterations=10)))
-        '''
+        if options['svm_pca']['use']:
+            print('optimizing SVM with PCA')
+            min_dimension = options['svm_pca']['min_dimension']
+            max_dimension = options['svm_pca']['max_dimension']
+            step = options['svm_pca']['step']
+            parameters = {'r_method': 'pca', 'dimension_range': range(min_dimension, max_dimension, step)}
+            svm_pca_results = optimize_svm(data, labels, parameters, iterations=10)
+            out_file.write('#support vector machine with dimensional reduction via PCA\n')
+            out_file.write('Optimum at {} dimensions with {}% accuracy\n\n'.format(svm_pca_results[0], svm_pca_results[1]*100))
         # SVM with RFE
-        parameters = {'r_method': 'rfe', 'dimension_range': range(2, 20, 2)}
-        out_file.write(str(optimize_svm(data, labels, parameters, iterations=10, plotting=True)))
+        if options['svm_rfe']['use']:
+            print('optimizing SVM with RFE')
+            min_dimension = options['svm_rfe']['min_dimension']
+            max_dimension = options['svm_rfe']['max_dimension']
+            step = options['svm_rfe']['step']
+            parameters = {'r_method': 'rfe', 'dimension_range': range(min_dimension, max_dimension, step)}
+            svm_rfe_results = optimize_svm(data, labels, parameters, iterations=10)
+            out_file.write('#support vector machine with dimensional reduction via RFE\n')
+            out_file.write('Optimum at {} dimensions with {}% accuracy\n\n'.format(svm_rfe_results[0], svm_rfe_results[1]*100))
         # random forest with RFE
-        parameters = {'r_method': 'rfe', 'dimension_range': range(len(data[0])-1000, len(data[0]), 100)}
-        out_file.write(str(optimize_rf(data, labels, parameters, iterations=10, plotting=True)))
+        if options['rf_rfe']['use']:
+            print('optimizing random forest with RFE')
+            min_dimension = options['rf_rfe']['min_dimension']
+            max_dimension = options['rf_rfe']['max_dimension']
+            step = options['rf_rfe']['step']
+            parameters = {'r_method': 'rfe', 'dimension_range': range(min_dimension, max_dimension, step)}
+            rf_rfe_results = optimize_rf(data, labels, parameters, iterations=10)
+            out_file.write('#random forest with dimensional reduction via RFE\n')
+            out_file.write('Optimum at {} dimensions with {}% accuracy\n\n'.format(rf_rfe_results[0], rf_rfe_results[1]*100))
         # random forest with PCA
-        parameters = {'r_method': 'pca', 'dimension_range': range(len(data[0]) - 1000, len(data[0]), 100)}
-        print(str(optimize_rf(data, labels, parameters, iterations=10)))
-        # random forest with not filtering
-        print(rf_no_filtering(data, labels))
-        parameters = {'dimension_range': range(1, 50, 2)}
-        print(str(optimize_knn(data, labels, parameters, plotting=True)))
+        if options['rf_pca']['use']:
+            print('optimizing random forest with PCA')
+            min_dimension = options['rf_pca']['min_dimension']
+            max_dimension = options['rf_pca']['max_dimension']
+            step = options['rf_pca']['step']
+            parameters = {'r_method': 'pca', 'dimension_range': range(min_dimension, max_dimension, step)}
+            rf_pca_results = optimize_rf(data, labels, parameters, iterations=10)
+            out_file.write('#random forest with dimensional reduction via PCA\n')
+            out_file.write('Optimum at {} dimensions with {}% accuracy\n\n'.format(rf_pca_results[0], rf_pca_results[1]*100))
+        # random forest with no filtering
+        if options['rf_unfiltered']['use']:
+            print('testing random forest without dimensional reduction')
+            rf_unfiltered_results = rf_no_filtering(data, labels)
+            out_file.write('#random forest without filtering\n')
+            out_file.write('{}% accuracy\n\n'.format(rf_unfiltered_results))
+        # kNN with PCA
+        if options['knn_pca']['use']:
+            print('testing kNN with PCA')
+            parameters = {'dimension_range': range(1, 50, 2)}
+            knn_pca_results = str(optimize_knn(data, labels, parameters))
+            out_file.write('#k-nearest neighbor with dimensional reduction via PCA\n')
+            out_file.write('Optimum at {} dimensions and {} neighbors with {}% accuracy\n\n'.format(knn_pca_results[0], knn_pca_results[1], knn_pca_results[2]*100))
