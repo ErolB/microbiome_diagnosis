@@ -319,6 +319,6 @@ if __name__ == '__main__':
         if options['knn_pca']['use']:
             print('testing kNN with PCA')
             parameters = {'dimension_range': range(1, 50, 2)}
-            knn_pca_results = str(optimize_knn(data, labels, parameters))
+            knn_pca_results = optimize_knn(data, labels, parameters)
             out_file.write('#k-nearest neighbor with dimensional reduction via PCA\n')
             out_file.write('Optimum at {} dimensions and {} neighbors with {}% accuracy\n\n'.format(knn_pca_results[0], knn_pca_results[1], knn_pca_results[2]*100))
