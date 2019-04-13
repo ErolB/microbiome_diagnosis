@@ -8,6 +8,7 @@ from tensorflow import keras
 import numpy as np
 import sys
 import time
+import multiprocessing
 import json
 #from mpl_toolkits.mplot3d import Axes3D
 from parsing import load_data
@@ -212,6 +213,9 @@ def optimize_nn_unfiltered(data, labels, parameters=None, iterations = 5, plotti
     optimal_layers = hidden_layer_counts[max_arg]
     return optimal_layers, np.max(np.asarray(acc_list))
 
+''' This is used for creating parallel processes '''
+def wrapper(args):
+    return k_fold_validation(args[0], args[1], args[2], args[3])
 
 def optimize_rf(data, labels, parameters, iterations=10, plotting=False):
     k = 0.25  # proportion of data used for testing
@@ -219,10 +223,10 @@ def optimize_rf(data, labels, parameters, iterations=10, plotting=False):
     acc_list = []
     for d in dimensions:
         parameters['n_components'] = d
-        total = 0
-        for i in range(iterations):
-            total += k_fold_validation(data, labels, rf_test, parameters.copy())
-        total /= iterations
+        pool = multiprocessing.Pool(iterations)
+        inputs = [(data, labels, rf_test, parameters.copy())] * iterations
+        results = pool.map(wrapper, inputs)
+        total = np.mean(results)
         acc_list.append(total)
     optimal_dimension = dimensions[np.argmax(acc_list)]
     if plotting:
