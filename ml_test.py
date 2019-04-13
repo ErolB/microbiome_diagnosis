@@ -260,69 +260,93 @@ if __name__ == '__main__':
         # NN unfiltered
         if options['nn_unfiltered']['use']:
             print('optimizing NN without filtering')
+            start = time.time()
             nn_unfiltered_results = optimize_nn_unfiltered(data, labels)
+            end = time.time()
             out_file.write('#neural network without dimensional reduction\n')
-            out_file.write('Optimum at {} hidden layers with {}% accuracy\n\n'.format(nn_unfiltered_results[0], nn_unfiltered_results[1]*100))
+            out_file.write('Optimum at {} hidden layers with {}% accuracy\n'.format(nn_unfiltered_results[0], nn_unfiltered_results[1]*100))
+            out_file.write('Completed in {} seconds\n\n'.format(end-start))
         # NN with PCA
         if options['nn_pca']['use']:
             print('optimizing NN with PCA')
+            start = time.time()
             min_dimension = options['nn_pca']['min_dimension']
             max_dimension = options['nn_pca']['max_dimension']
             step = options['nn_pca']['step']
             parameters = {'dimension_range': range(min_dimension, max_dimension, step)}
             nn_pca_results = optimize_nn(data, labels, parameters)
+            end = time.time()
             out_file.write('#neural network with dimensional reduction via PCA\n')
-            out_file.write('Optimum at {} dimensions and {} hidden layers with {}% accuracy\n\n'.format(nn_pca_results[0], nn_pca_results[1], nn_pca_results[2]*100))
+            out_file.write('Optimum at {} dimensions and {} hidden layers with {}% accuracy\n'.format(nn_pca_results[0], nn_pca_results[1], nn_pca_results[2]*100))
+            out_file.write('Completed in {} seconds\n\n'.format(end-start))
         # SVM with PCA
         if options['svm_pca']['use']:
             print('optimizing SVM with PCA')
+            start = time.time()
             min_dimension = options['svm_pca']['min_dimension']
             max_dimension = options['svm_pca']['max_dimension']
             step = options['svm_pca']['step']
             parameters = {'r_method': 'pca', 'dimension_range': range(min_dimension, max_dimension, step)}
             svm_pca_results = optimize_svm(data, labels, parameters, iterations=10)
+            end = time.time()
             out_file.write('#support vector machine with dimensional reduction via PCA\n')
-            out_file.write('Optimum at {} dimensions with {}% accuracy\n\n'.format(svm_pca_results[0], svm_pca_results[1]*100))
+            out_file.write('Optimum at {} dimensions with {}% accuracy\n'.format(svm_pca_results[0], svm_pca_results[1]*100))
+            out_file.write('Completed in {} seconds\n\n'.format(end - start))
         # SVM with RFE
         if options['svm_rfe']['use']:
             print('optimizing SVM with RFE')
+            start = time.time()
             min_dimension = options['svm_rfe']['min_dimension']
             max_dimension = options['svm_rfe']['max_dimension']
             step = options['svm_rfe']['step']
             parameters = {'r_method': 'rfe', 'dimension_range': range(min_dimension, max_dimension, step)}
             svm_rfe_results = optimize_svm(data, labels, parameters, iterations=10)
+            end = time.time()
             out_file.write('#support vector machine with dimensional reduction via RFE\n')
-            out_file.write('Optimum at {} dimensions with {}% accuracy\n\n'.format(svm_rfe_results[0], svm_rfe_results[1]*100))
+            out_file.write('Optimum at {} dimensions with {}% accuracy\n'.format(svm_rfe_results[0], svm_rfe_results[1]*100))
+            out_file.write('Completed in {} seconds\n\n'.format(end - start))
         # random forest with RFE
         if options['rf_rfe']['use']:
             print('optimizing random forest with RFE')
+            start = time.time()
             min_dimension = options['rf_rfe']['min_dimension']
             max_dimension = options['rf_rfe']['max_dimension']
             step = options['rf_rfe']['step']
             parameters = {'r_method': 'rfe', 'dimension_range': range(min_dimension, max_dimension, step)}
-            rf_rfe_results = optimize_rf(data, labels, parameters, iterations=10)
+            rf_rfe_results = optimize_rf(data, labels, parameters, iterations=6)
+            end = time.time()
             out_file.write('#random forest with dimensional reduction via RFE\n')
-            out_file.write('Optimum at {} dimensions with {}% accuracy\n\n'.format(rf_rfe_results[0], rf_rfe_results[1]*100))
+            out_file.write('Optimum at {} dimensions with {}% accuracy\n'.format(rf_rfe_results[0], rf_rfe_results[1]*100))
+            out_file.write('Completed in {} seconds\n\n'.format(end - start))
         # random forest with PCA
         if options['rf_pca']['use']:
             print('optimizing random forest with PCA')
+            start = time.time()
             min_dimension = options['rf_pca']['min_dimension']
             max_dimension = options['rf_pca']['max_dimension']
             step = options['rf_pca']['step']
             parameters = {'r_method': 'pca', 'dimension_range': range(min_dimension, max_dimension, step)}
             rf_pca_results = optimize_rf(data, labels, parameters, iterations=10)
+            end = time.time()
             out_file.write('#random forest with dimensional reduction via PCA\n')
-            out_file.write('Optimum at {} dimensions with {}% accuracy\n\n'.format(rf_pca_results[0], rf_pca_results[1]*100))
+            out_file.write('Optimum at {} dimensions with {}% accuracy\n'.format(rf_pca_results[0], rf_pca_results[1]*100))
+            out_file.write('Completed in {} seconds\n\n'.format(end - start))
         # random forest with no filtering
         if options['rf_unfiltered']['use']:
             print('testing random forest without dimensional reduction')
+            start = time.time()
             rf_unfiltered_results = rf_no_filtering(data, labels)
+            end = time.time()
             out_file.write('#random forest without filtering\n')
-            out_file.write('{}% accuracy\n\n'.format(rf_unfiltered_results))
+            out_file.write('{}% accuracy\n'.format(rf_unfiltered_results))
+            out_file.write('Completed in {} seconds\n\n'.format(end - start))
         # kNN with PCA
         if options['knn_pca']['use']:
             print('testing kNN with PCA')
+            start = time.time()
             parameters = {'dimension_range': range(1, 50, 2)}
             knn_pca_results = optimize_knn(data, labels, parameters)
+            end = time.time()
             out_file.write('#k-nearest neighbor with dimensional reduction via PCA\n')
-            out_file.write('Optimum at {} dimensions and {} neighbors with {}% accuracy\n\n'.format(knn_pca_results[0], knn_pca_results[1], knn_pca_results[2]*100))
+            out_file.write('Optimum at {} dimensions and {} neighbors with {}% accuracy\n'.format(knn_pca_results[0], knn_pca_results[1], knn_pca_results[2]*100))
+            out_file.write('Completed in {} seconds\n\n'.format(end - start))
