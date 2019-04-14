@@ -16,6 +16,8 @@ from parsing import load_data
 mode = 'test'
 # mode = 'normal'
 
+CORES = 4
+
 class RandomForestClassifierRFE(RandomForestClassifier):
     def fit(self, *args, **kwargs):
         super(RandomForestClassifierRFE, self).fit(*args, **kwargs)
@@ -138,19 +140,24 @@ def k_fold_validation(data, labels, ml_test, parameters, k=0.25):
     return score_sum / n_iterations
 
 
-def optimize_knn(data, labels, parameters, iterations=10, plotting=False):
-    k = 0.25  # proportion of data used for testing
+''' This is used for creating parallel processes '''
+def wrapper(args):
+    return k_fold_validation(args[0], args[1], args[2], args[3])
+
+
+def optimize_knn(data, labels, parameters, plotting=False):
     n_dimensions = list(parameters['dimension_range'])
     n_neighbors = list(range(1, 20))
     z = []
     for n in n_neighbors:
         acc_list = []
         for d in n_dimensions:
-            total = 0
             parameters = {'n_components': d, 'n_neighbors': n, 'r_method': 'pca'}
-            for i in range(iterations):
-                total += k_fold_validation(data, labels, knn_test, parameters)
-            acc_list.append(total/iterations)
+            inputs = [(data, labels, rf_test, parameters.copy())] * CORES
+            pool = multiprocessing.Pool(CORES)
+            results = pool.map(wrapper, inputs)
+            total = np.mean(results)
+            acc_list.append(total)
         z.append(acc_list)
     optimum = np.argmax(np.array(z))
     optimal_value = np.array(z).flatten()[optimum]
@@ -173,10 +180,11 @@ def optimize_svm(data, labels, parameters, iterations = 10, plotting=False):
     acc_list = []
     for d in dimensions:
         parameters['n_components'] = d
-        total = 0
-        for i in range(iterations):
-            total += k_fold_validation(data, labels, svm_test, parameters)
-        acc_list.append(total/iterations)
+        pool = multiprocessing.Pool(CORES)
+        inputs = [(data, labels, rf_test, parameters.copy())] * CORES
+        results = pool.map(wrapper, inputs)
+        total = np.mean(results)
+        acc_list.append(total)
     if plotting:
         plt.plot(dimensions, acc_list)
         plt.xlabel('number of dimensions')
@@ -213,9 +221,6 @@ def optimize_nn_unfiltered(data, labels, parameters=None, iterations = 5, plotti
     optimal_layers = hidden_layer_counts[max_arg]
     return optimal_layers, np.max(np.asarray(acc_list))
 
-''' This is used for creating parallel processes '''
-def wrapper(args):
-    return k_fold_validation(args[0], args[1], args[2], args[3])
 
 def optimize_rf(data, labels, parameters, iterations=10, plotting=False):
     k = 0.25  # proportion of data used for testing
@@ -223,8 +228,8 @@ def optimize_rf(data, labels, parameters, iterations=10, plotting=False):
     acc_list = []
     for d in dimensions:
         parameters['n_components'] = d
-        pool = multiprocessing.Pool(iterations)
-        inputs = [(data, labels, rf_test, parameters.copy())] * iterations
+        pool = multiprocessing.Pool(CORES)
+        inputs = [(data, labels, rf_test, parameters.copy())] * CORES
         results = pool.map(wrapper, inputs)
         total = np.mean(results)
         acc_list.append(total)
@@ -251,7 +256,7 @@ if __name__ == '__main__':
     options = json.loads(open('parameters.json', 'r').read())
     # load data
     if mode == 'test':
-        pos, neg = load_data('formatted_data/rats_97')
+        pos, neg = load_data('formatted_data/rats_ileum')
     else:
         pos, neg = load_data(sys.argv[1])
     data, labels = pd_to_data(pos, neg)
@@ -266,6 +271,7 @@ if __name__ == '__main__':
             out_file.write('#neural network without dimensional reduction\n')
             out_file.write('Optimum at {} hidden layers with {}% accuracy\n'.format(nn_unfiltered_results[0], nn_unfiltered_results[1]*100))
             out_file.write('Completed in {} seconds\n\n'.format(end-start))
+            out_file.flush()
         # NN with PCA
         if options['nn_pca']['use']:
             print('optimizing NN with PCA')
@@ -279,6 +285,7 @@ if __name__ == '__main__':
             out_file.write('#neural network with dimensional reduction via PCA\n')
             out_file.write('Optimum at {} dimensions and {} hidden layers with {}% accuracy\n'.format(nn_pca_results[0], nn_pca_results[1], nn_pca_results[2]*100))
             out_file.write('Completed in {} seconds\n\n'.format(end-start))
+            out_file.flush()
         # SVM with PCA
         if options['svm_pca']['use']:
             print('optimizing SVM with PCA')
@@ -292,6 +299,7 @@ if __name__ == '__main__':
             out_file.write('#support vector machine with dimensional reduction via PCA\n')
             out_file.write('Optimum at {} dimensions with {}% accuracy\n'.format(svm_pca_results[0], svm_pca_results[1]*100))
             out_file.write('Completed in {} seconds\n\n'.format(end - start))
+            out_file.flush()
         # SVM with RFE
         if options['svm_rfe']['use']:
             print('optimizing SVM with RFE')
@@ -305,6 +313,7 @@ if __name__ == '__main__':
             out_file.write('#support vector machine with dimensional reduction via RFE\n')
             out_file.write('Optimum at {} dimensions with {}% accuracy\n'.format(svm_rfe_results[0], svm_rfe_results[1]*100))
             out_file.write('Completed in {} seconds\n\n'.format(end - start))
+            out_file.flush()
         # random forest with RFE
         if options['rf_rfe']['use']:
             print('optimizing random forest with RFE')
@@ -318,6 +327,7 @@ if __name__ == '__main__':
             out_file.write('#random forest with dimensional reduction via RFE\n')
             out_file.write('Optimum at {} dimensions with {}% accuracy\n'.format(rf_rfe_results[0], rf_rfe_results[1]*100))
             out_file.write('Completed in {} seconds\n\n'.format(end - start))
+            out_file.flush()
         # random forest with PCA
         if options['rf_pca']['use']:
             print('optimizing random forest with PCA')
@@ -331,6 +341,7 @@ if __name__ == '__main__':
             out_file.write('#random forest with dimensional reduction via PCA\n')
             out_file.write('Optimum at {} dimensions with {}% accuracy\n'.format(rf_pca_results[0], rf_pca_results[1]*100))
             out_file.write('Completed in {} seconds\n\n'.format(end - start))
+            out_file.flush()
         # random forest with no filtering
         if options['rf_unfiltered']['use']:
             print('testing random forest without dimensional reduction')
@@ -340,6 +351,7 @@ if __name__ == '__main__':
             out_file.write('#random forest without filtering\n')
             out_file.write('{}% accuracy\n'.format(rf_unfiltered_results))
             out_file.write('Completed in {} seconds\n\n'.format(end - start))
+            out_file.flush()
         # kNN with PCA
         if options['knn_pca']['use']:
             print('testing kNN with PCA')
@@ -350,3 +362,4 @@ if __name__ == '__main__':
             out_file.write('#k-nearest neighbor with dimensional reduction via PCA\n')
             out_file.write('Optimum at {} dimensions and {} neighbors with {}% accuracy\n'.format(knn_pca_results[0], knn_pca_results[1], knn_pca_results[2]*100))
             out_file.write('Completed in {} seconds\n\n'.format(end - start))
+            out_file.flush()
