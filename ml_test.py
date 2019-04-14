@@ -16,7 +16,7 @@ from parsing import load_data
 mode = 'test'
 # mode = 'normal'
 
-CORES = 4
+CORES = 1
 
 class RandomForestClassifierRFE(RandomForestClassifier):
     def fit(self, *args, **kwargs):
@@ -153,7 +153,7 @@ def optimize_knn(data, labels, parameters, plotting=False):
         acc_list = []
         for d in n_dimensions:
             parameters = {'n_components': d, 'n_neighbors': n, 'r_method': 'pca'}
-            inputs = [(data, labels, rf_test, parameters.copy())] * CORES
+            inputs = [(data, labels, knn_test, parameters.copy())] * CORES
             pool = multiprocessing.Pool(CORES)
             results = pool.map(wrapper, inputs)
             total = np.mean(results)
@@ -181,7 +181,7 @@ def optimize_svm(data, labels, parameters, iterations = 10, plotting=False):
     for d in dimensions:
         parameters['n_components'] = d
         pool = multiprocessing.Pool(CORES)
-        inputs = [(data, labels, rf_test, parameters.copy())] * CORES
+        inputs = [(data, labels, svm_test, parameters.copy())] * CORES
         results = pool.map(wrapper, inputs)
         total = np.mean(results)
         acc_list.append(total)
